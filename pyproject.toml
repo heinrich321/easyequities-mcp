@@ -1,0 +1,49 @@
+[project]
+name = "easy-equities-mcp"
+version = "0.1.0"
+description = "MCP server for Easy Equities and Satrix — query your accounts, holdings, and transactions from any MCP client."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.13"
+keywords = ["mcp", "easyequities", "satrix", "model-context-protocol", "claude", "anthropic"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    "easy-equities-client>=1.2.0",
+    "mcp[cli]>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/heinrich321/easyequities-mcp"
+Repository = "https://github.com/heinrich321/easyequities-mcp"
+Issues = "https://github.com/heinrich321/easyequities-mcp/issues"
+
+[project.scripts]
+easy-equities-mcp = "easy_equities_mcp.server:main"
+easy-equities-mcp-login = "easy_equities_mcp.server:login_cli"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/easy_equities_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
