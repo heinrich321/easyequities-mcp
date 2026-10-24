@@ -23,6 +23,9 @@ dependencies = [
     "requests>=2.31.0",
 ]
 
+[project.optional-dependencies]
+browser = ["playwright>=1.47"]
+
 [project.urls]
 Homepage = "https://github.com/heinrich321/easyequities-mcp"
 Repository = "https://github.com/heinrich321/easyequities-mcp"
@@ -31,6 +34,7 @@ Issues = "https://github.com/heinrich321/easyequities-mcp/issues"
 [project.scripts]
 easy-equities-mcp = "easy_equities_mcp.server:main"
 easy-equities-mcp-login = "easy_equities_mcp.server:login_cli"
+easy-equities-mcp-browser-login = "easy_equities_mcp.browser_login:main"
 
 [dependency-groups]
 dev = [

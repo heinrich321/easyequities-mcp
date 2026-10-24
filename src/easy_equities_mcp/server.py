@@ -62,6 +62,18 @@ _CONFIG_CANDIDATES: tuple[Path, ...] = (
     Path.cwd() / ".env",
 )
 
+# Sent on every platform request. Matches the Chromium that browser_login
+# drives, so cookies are always presented with the UA they were issued to.
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+)
+BROWSER_HEADERS = {
+    "User-Agent": BROWSER_USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-ZA,en-GB;q=0.9,en;q=0.8",
+}
+
 
 # ---------------------------------------------------------------------------
 # Config / session discovery
@@ -210,9 +222,11 @@ def _cookies_valid(client: PlatformClient) -> bool:
 
 
 def _build_client(platform: str) -> PlatformClient:
-    if platform == "satrix":
-        return SatrixClient()
-    return EasyEquitiesClient()
+    client = SatrixClient() if platform == "satrix" else EasyEquitiesClient()
+    # EE's CloudFront rejects the default python-requests User-Agent with 403
+    # on every path, so present as the same browser used by browser_login.
+    client.session.headers.update(BROWSER_HEADERS)
+    return client
 
 
 def _password_login(
@@ -242,7 +256,9 @@ def _auto_login() -> None:
 
         if not username or not password:
             logger.warning(
-                "Session %s: no valid cookies and no credentials; skipping",
+                "Session %s: no valid cookies and no password; skipping. "
+                "Run 'easy-equities-mcp-browser-login %s' to log in.",
+                session_key,
                 session_key,
             )
             continue
@@ -311,7 +327,11 @@ def refresh_session(session: str) -> str:
 
     username, password, platform = sessions[session_key]
     if not username or not password:
-        return f"Session '{session_key}' is missing username or password."
+        return (
+            f"Session '{session_key}' has no password configured. Run "
+            f"'easy-equities-mcp-browser-login {session_key}' in a terminal, "
+            "then restart the MCP server."
+        )
 
     try:
         _password_login(session_key, username, password, platform)
