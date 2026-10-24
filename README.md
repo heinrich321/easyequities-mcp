@@ -219,8 +219,9 @@ please open an issue with the error message so OTP support can be added.
 
 ## Security notes
 
-- The server stores session cookies under `~/.easy-equities-mcp/` with mode
-  `0700`/`0600`. Anyone with access to that directory can impersonate the
+- The server stores session cookies as plain JSON (`<session>.cookies.json`)
+  under `~/.easy-equities-mcp/` with mode `0700`/`0600`. (Earlier versions
+  used `pickle`, which is unsafe to load from a writable location.) Anyone with access to that directory can impersonate the
   logged-in user.
 - `.env` files should be kept at `0600` and never committed. The repo's
   `.gitignore` excludes them by default.

@@ -73,4 +73,4 @@ def test_require_session_raises_with_available_list():
 
 def test_cookie_file_uses_cookie_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "COOKIE_DIR", tmp_path)
-    assert server._cookie_file("personal") == tmp_path / "personal.cookies"
+    assert server._cookie_file("personal") == tmp_path / "personal.cookies.json"

@@ -36,3 +36,4 @@ dist/
 
 # Cookies (never committed; kept in user home)
 *.cookies
+*.cookies.json

@@ -17,7 +17,6 @@ import dataclasses
 import json
 import logging
 import os
-import pickle
 import re
 import sys
 from datetime import date
@@ -25,6 +24,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from requests.cookies import RequestsCookieJar, create_cookie
 
 from easy_equities_client import constants
 from easy_equities_client.clients import (
@@ -120,14 +120,61 @@ def _discover_sessions() -> dict[str, tuple[str, str, str]]:
 
 
 def _cookie_file(session: str) -> Path:
-    return COOKIE_DIR / f"{session}.cookies"
+    return COOKIE_DIR / f"{session}.cookies.json"
+
+
+def _cookies_to_json(jar: RequestsCookieJar) -> list[dict]:
+    """Serialise a cookie jar to plain JSON-safe dicts (no pickle)."""
+    return [
+        {
+            "name": c.name,
+            "value": c.value,
+            "domain": c.domain,
+            "path": c.path,
+            "secure": c.secure,
+            "expires": c.expires,
+            "rest": dict(c._rest),  # e.g. {"HttpOnly": None}
+        }
+        for c in jar
+    ]
+
+
+def _cookies_from_json(data: object) -> RequestsCookieJar:
+    """Rebuild a cookie jar from the JSON produced by _cookies_to_json.
+
+    Validates shape so a tampered file fails closed rather than loading garbage.
+    """
+    if not isinstance(data, list):
+        raise ValueError("cookie file must contain a JSON list")
+    jar = RequestsCookieJar()
+    for item in data:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+            raise ValueError("malformed cookie entry")
+        rest = item.get("rest") or {}
+        if not isinstance(rest, dict):
+            raise ValueError("malformed cookie entry")
+        jar.set_cookie(
+            create_cookie(
+                name=item["name"],
+                value=str(item.get("value", "")),
+                domain=str(item.get("domain", "")),
+                path=str(item.get("path", "/")),
+                secure=bool(item.get("secure", False)),
+                expires=item.get("expires"),
+                rest=rest,
+            )
+        )
+    return jar
 
 
 def _save_cookies(client: PlatformClient, session: str) -> None:
     COOKIE_DIR.mkdir(mode=0o700, exist_ok=True, parents=True)
     path = _cookie_file(session)
-    with open(path, "wb") as f:
-        pickle.dump(client.session.cookies, f)
+    # Create with 0600 from the start rather than chmod after writing, so the
+    # file is never briefly readable by others.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(_cookies_to_json(client.session.cookies), f)
     path.chmod(0o600)
 
 
@@ -136,8 +183,8 @@ def _load_cookies(client: PlatformClient, session: str) -> bool:
     if not path.exists():
         return False
     try:
-        with open(path, "rb") as f:
-            client.session.cookies.update(pickle.load(f))
+        with open(path, encoding="utf-8") as f:
+            client.session.cookies.update(_cookies_from_json(json.load(f)))
         return True
     except Exception:
         logger.exception("Failed to load cookies for %s", session)
