@@ -122,6 +122,7 @@ put everything in your MCP client's config block — see below.
 |---|---|---|
 | `EE_MCP_ENV_FILE` | *unset* | Explicit path to a `.env` file. |
 | `EE_MCP_COOKIE_DIR` | `~/.easy-equities-mcp` | Where session cookies are cached. |
+| `EE_MCP_KEEPALIVE_MINUTES` | `0` (off) | If set, touch each session every N minutes to stop an inactivity timeout. |
 
 ## Using it with Claude Desktop
 
@@ -187,13 +188,16 @@ You:    Show me my current holdings.
 Claude: [calls list_sessions → list_accounts("personal") → get_holdings("personal", "12345")]
 ```
 
-When cookies eventually expire, run `easy-equities-mcp-browser-login <name>`
-again and restart the MCP client. (`refresh_session` only works for sessions
-with a password configured, and password login is currently broken; see below.)
+When the EE session expires, tools return an error that names the fix:
+run `easy-equities-mcp-browser-login <name>` in a terminal. Running servers
+pick up the new cookies on their next call, so no restart is needed. An
+expired session is never reported as an empty account.
 
 ## CLI
 
-`easy-equities-mcp-browser-login` is the primary way to log in. It needs the
+`easy-equities-mcp-browser-login` is the primary way to log in. It first tries
+a silent headless refresh with the saved browser profile, then opens a window.
+It needs the
 `browser` extra (`uv sync --extra browser && uv run playwright install chromium`).
 
 ```bash
@@ -230,6 +234,34 @@ browser User-Agent on all requests.
    Gives up after 5 minutes.
 
 The MCP server then reuses those cookies on every restart until they expire.
+
+### When the session expires
+
+Every platform response is checked for EE's sign-in flow (a redirect to
+`/Account/SignIn` or EasyID, the sign-in URL returned as JSON, or the login
+form itself). On expiry the server, once per call:
+
+1. adopts cookies saved by the browser login since it loaded its own, or
+2. tries a headless browser refresh with the saved profile (at most every
+   5 minutes per session), then retries the call.
+
+If both fail, the tool returns an error naming the browser-login command.
+`refresh_session` / `refresh_all_sessions` run the same check on demand.
+
+EasyID currently keeps its login in a browser-session cookie and has no
+"remember me" option, so the headless refresh only works while the profile
+still holds a live EasyID login; in practice each new EE session needs the
+browser login.
+
+Expiry and refresh events are appended to
+`~/.easy-equities-mcp/session-events.jsonl` (mode `0600`), with minutes since
+login and since the last successful call, so you can tell whether EE expires
+sessions after a fixed time or after inactivity. If it's inactivity, set
+`EE_MCP_KEEPALIVE_MINUTES` (e.g. `10`).
+
+The server switches account before every account-scoped call, because EE
+keeps the selected account per login session and that session is shared by
+every MCP process using the same cookies.
 
 ## Security notes
 

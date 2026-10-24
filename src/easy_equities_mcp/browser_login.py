@@ -203,7 +203,7 @@ def main() -> None:
         f"Session '{session_key}' logged in. "
         f"Cookies saved to {server._cookie_file(session_key)}"
     )
-    print("Restart your MCP client to pick up the session.")
+    print("Running MCP servers pick up the new cookies on their next call.")
 
 
 if __name__ == "__main__":
