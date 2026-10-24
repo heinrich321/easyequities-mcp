@@ -90,3 +90,44 @@ def test_export_drops_cookies_for_other_hosts():
 def test_build_client_sends_browser_user_agent():
     client = server._build_client("easyequities")
     assert client.session.headers["User-Agent"] == server.BROWSER_USER_AGENT
+
+
+@pytest.fixture
+def cli_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(server, "COOKIE_DIR", tmp_path)
+    monkeypatch.setattr(server, "_load_config", lambda override=False: None)
+    monkeypatch.setenv("EE_SESSION_PERSONAL_USERNAME", "someone")
+    monkeypatch.setattr("sys.argv", ["easy-equities-mcp-browser-login", "personal"])
+    calls: list[bool] = []
+    return calls
+
+
+def test_cli_falls_back_to_headed_when_headless_needs_login(cli_env, monkeypatch):
+    def fake_refresh(session_key, platform, headless=True):
+        cli_env.append(headless)
+        if headless:
+            raise browser_login.LoginRequired("needs login")
+
+    monkeypatch.setattr(browser_login, "refresh_cookies", fake_refresh)
+    browser_login.main()
+    assert cli_env == [True, False]
+
+
+def test_cli_skips_window_when_headless_refresh_succeeds(cli_env, monkeypatch):
+    monkeypatch.setattr(
+        browser_login,
+        "refresh_cookies",
+        lambda session_key, platform, headless=True: cli_env.append(headless),
+    )
+    browser_login.main()
+    assert cli_env == [True]
+
+
+def test_cli_exits_non_zero_when_headed_login_fails(cli_env, monkeypatch):
+    def fake_refresh(session_key, platform, headless=True):
+        raise browser_login.LoginRequired("Timed out.")
+
+    monkeypatch.setattr(browser_login, "refresh_cookies", fake_refresh)
+    with pytest.raises(SystemExit) as exc:
+        browser_login.main()
+    assert exc.value.code == 1
